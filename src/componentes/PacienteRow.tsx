@@ -1,0 +1,48 @@
+
+import BadgeEstado from './BadgeEstado'
+import type { Paciente } from '../types/paciente'
+
+interface PacienteRowProps {
+  paciente: Paciente
+}
+
+export default function PacienteRow({ paciente }: PacienteRowProps) {
+  const iniciales = `${paciente.nombre.charAt(0)}${paciente.apellido.charAt(0)}`
+
+  return (
+    <tr className="border-b border-slate-100 transition hover:bg-blue-50/50">
+      <td className="px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 font-extrabold text-blue-700">
+            {iniciales}
+          </div>
+
+          <div className="min-w-0">
+            <p className="font-bold text-slate-900">
+              {paciente.nombre} {paciente.apellido}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {paciente.email}
+            </p>
+          </div>
+        </div>
+      </td>
+
+      <td className="px-5 py-4 text-sm text-slate-600">
+        {paciente.telefono}
+      </td>
+
+      <td className="px-5 py-4 text-sm text-slate-600">
+        {paciente.especialidadAsignada}
+      </td>
+
+      <td className="px-5 py-4 text-sm text-slate-600">
+        {paciente.ultimaCita}
+      </td>
+
+      <td className="px-5 py-4">
+        <BadgeEstado estado={paciente.estado} />
+      </td>
+    </tr>
+  )
+}
