@@ -1,5 +1,10 @@
-import PaginaPacientes from './pages/PaginaPacientes'
+
+import FormularioCita from './componentes/FormularioCita'
 
 export default function App() {
-  return <PaginaPacientes />
+  return (
+    <main className="min-h-screen bg-gray-100 px-4 py-10 sm:px-6">
+      <FormularioCita />
+    </main>
+  )
 }
