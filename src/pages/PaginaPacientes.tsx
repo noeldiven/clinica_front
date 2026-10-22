@@ -12,7 +12,7 @@ import PacienteCard from '../componentes/PacienteCard'
 import BuscadorPacientes from '../componentes/BuscadorPacientes'
 import type { EstadoPaciente, Paciente } from '../types/paciente'
 
-const pacientesEjemplo: Paciente[] = [
+export const PACIENTES_INICIALES: Paciente[] = [
   {
     id: '1',
     nombre: 'Elena',
@@ -66,7 +66,7 @@ const pacientesEjemplo: Paciente[] = [
 ]
 
 export default function PaginaPacientes() {
-  const [pacientes, setPacientes] = useState<Paciente[]>(pacientesEjemplo)
+  const [pacientes, setPacientes] = useState<Paciente[]>(PACIENTES_INICIALES)
   const [busqueda, setBusqueda] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState<
     'Todos' | EstadoPaciente
