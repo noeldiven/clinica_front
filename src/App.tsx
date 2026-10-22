@@ -1,10 +1,22 @@
 
-import FormularioCita from './componentes/FormularioCita'
+import { Route, Routes } from 'react-router-dom'
+import Layout from './componentes/Layout'
+import PaginaDashboard from './pages/PaginaDashboard'
+import PaginaPacientes from './pages/PaginaPacientes'
+import PaginaDetallePaciente from './pages/PaginaDetallePaciente'
+import PaginaNuevaCita from './pages/PaginaNuevaCita'
+import PaginaNotFound from './pages/PaginaNotFound'
 
 export default function App() {
   return (
-    <main className="min-h-screen bg-gray-100 px-4 py-10 sm:px-6">
-      <FormularioCita />
-    </main>
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<PaginaDashboard />} />
+        <Route path="pacientes" element={<PaginaPacientes />} />
+        <Route path="pacientes/:id" element={<PaginaDetallePaciente />} />
+        <Route path="citas/nueva" element={<PaginaNuevaCita />} />
+        <Route path="*" element={<PaginaNotFound />} />
+      </Route>
+    </Routes>
   )
 }
