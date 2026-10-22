@@ -1,4 +1,5 @@
 import type { ChangeEvent } from 'react'
+import { Link } from 'react-router-dom'
 import BadgeEstado from './BadgeEstado'
 import type { EstadoPaciente, Paciente } from '../types/paciente'
 
@@ -59,10 +60,15 @@ export default function PacienteCard({
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-bold text-slate-600">
+        <label
+          htmlFor={`estado-${paciente.id}`}
+          className="mb-1 block text-xs font-bold text-slate-600"
+        >
           Cambiar estado
         </label>
+
         <select
+          id={`estado-${paciente.id}`}
           aria-label={`Cambiar estado de ${paciente.nombre}`}
           value={paciente.estado}
           onChange={handleEstadoChange}
@@ -73,6 +79,13 @@ export default function PacienteCard({
           <option value="en_espera">En espera</option>
         </select>
       </div>
+
+      <Link
+        to={`/pacientes/${paciente.id}`}
+        className="rounded-xl bg-blue-50 px-4 py-2.5 text-center text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+      >
+        Ver detalle →
+      </Link>
 
       <button
         type="button"

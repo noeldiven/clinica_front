@@ -1,4 +1,5 @@
 import type { ChangeEvent } from 'react'
+import { Link } from 'react-router-dom'
 import BadgeEstado from './BadgeEstado'
 import type { EstadoPaciente, Paciente } from '../types/paciente'
 
@@ -26,6 +27,7 @@ export default function PacienteRow({
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 font-extrabold text-blue-700">
             {iniciales}
           </div>
+
           <div className="min-w-0">
             <p className="font-bold text-slate-900">
               {paciente.nombre} {paciente.apellido}
@@ -38,9 +40,11 @@ export default function PacienteRow({
       <td className="px-5 py-4 text-sm text-slate-600">
         {paciente.telefono}
       </td>
+
       <td className="px-5 py-4 text-sm text-slate-600">
         {paciente.especialidadAsignada}
       </td>
+
       <td className="px-5 py-4 text-sm text-slate-600">
         {paciente.ultimaCita}
       </td>
@@ -63,13 +67,22 @@ export default function PacienteRow({
       </td>
 
       <td className="px-5 py-4">
-        <button
-          type="button"
-          onClick={() => onEliminar(paciente.id)}
-          className="rounded-lg px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
-        >
-          Eliminar
-        </button>
+        <div className="flex flex-col items-start gap-2">
+          <Link
+            to={`/pacientes/${paciente.id}`}
+            className="whitespace-nowrap text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline"
+          >
+            Ver detalle →
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => onEliminar(paciente.id)}
+            className="rounded-lg px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
+          >
+            Eliminar
+          </button>
+        </div>
       </td>
     </tr>
   )
