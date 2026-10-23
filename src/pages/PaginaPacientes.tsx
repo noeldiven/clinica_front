@@ -1,72 +1,26 @@
-/*
- * Problemas encontrados en el código generado por la IA:
- * 1. Mezcla toda la interfaz en un único archivo HTML, sin separar componentes reutilizables.
- * 2. Repite los datos de pacientes directamente en el marcado en lugar de usar datos tipados.
- * 3. Usa manipulación directa del DOM para buscar y filtrar, en vez de estructurar la interfaz con React y TypeScript.
- */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
+import api from '../lib/axios'
 import PacienteRow from '../componentes/PacienteRow'
 import PacienteCard from '../componentes/PacienteCard'
 import BuscadorPacientes from '../componentes/BuscadorPacientes'
 import type { EstadoPaciente, Paciente } from '../types/paciente'
 
-export const PACIENTES_INICIALES: Paciente[] = [
-  {
-    id: '1',
-    nombre: 'Elena',
-    apellido: 'Morales Ruiz',
-    email: 'elena.morales@email.com',
-    telefono: '987 654 321',
-    especialidadAsignada: 'Cardiología',
-    ultimaCita: '12 oct. 2026',
-    estado: 'activo',
-  },
-  {
-    id: '2',
-    nombre: 'Carlos',
-    apellido: 'Mendoza Vega',
-    email: 'carlos.mendoza@email.com',
-    telefono: '986 123 456',
-    especialidadAsignada: 'Medicina General',
-    ultimaCita: '10 oct. 2026',
-    estado: 'activo',
-  },
-  {
-    id: '3',
-    nombre: 'Lucía',
-    apellido: 'Herrera Ortiz',
-    email: 'lucia.herrera@email.com',
-    telefono: '985 222 333',
-    especialidadAsignada: 'Pediatría',
-    ultimaCita: 'Sin citas previas',
-    estado: 'en_espera',
-  },
-  {
-    id: '4',
-    nombre: 'Javier',
-    apellido: 'Benítez Soler',
-    email: 'javier.benitez@email.com',
-    telefono: '984 555 666',
-    especialidadAsignada: 'Dermatología',
-    ultimaCita: '15 ago. 2026',
-    estado: 'inactivo',
-  },
-  {
-    id: '5',
-    nombre: 'Sofía',
-    apellido: 'Romero Castro',
-    email: 'sofia.romero@email.com',
-    telefono: '983 777 888',
-    especialidadAsignada: 'Medicina General',
-    ultimaCita: '13 oct. 2026',
-    estado: 'activo',
-  },
-]
+interface PacienteAPI {
+  id: number
+  nombre: string
+  apellidos: string
+  email: string
+  telefono: string
+  fechaNacimiento: string
+}
 
 export default function PaginaPacientes() {
-  const [pacientes, setPacientes] = useState<Paciente[]>(PACIENTES_INICIALES)
+  const [pacientes, setPacientes] = useState<Paciente[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState('')
+
   const [busqueda, setBusqueda] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState<
     'Todos' | EstadoPaciente
@@ -80,12 +34,61 @@ export default function PaginaPacientes() {
     useState<EstadoPaciente>('activo')
   const [error, setError] = useState('')
 
-  // Los filtros se calculan en cada render sin modificar los pacientes originales.
-  const pacientesFiltrados = pacientes.filter(
-    (paciente) =>
-      paciente.nombre.toLowerCase().includes(busqueda.toLowerCase()) &&
-      (estadoFiltro === 'Todos' || paciente.estado === estadoFiltro),
-  )
+  // Consultar los pacientes reales del backend.
+  useEffect(() => {
+    async function cargarPacientes() {
+      try {
+        setCargando(true)
+        setErrorCarga('')
+
+        const respuesta = await api.get<PacienteAPI[]>('/pacientes')
+
+        const pacientesAdaptados: Paciente[] = respuesta.data.map(
+          (paciente) => ({
+            id: String(paciente.id),
+            nombre: paciente.nombre,
+            apellido: paciente.apellidos,
+            email: paciente.email,
+            telefono: paciente.telefono,
+            especialidadAsignada: 'No disponible',
+            ultimaCita: 'No disponible',
+            // El backend actual no proporciona el estado clínico.
+            // Se usa este valor solo para mantener la compatibilidad
+            // con los componentes existentes.
+            estado: 'activo',
+          }),
+        )
+
+        setPacientes(pacientesAdaptados)
+      } catch (error) {
+        console.error('Error al cargar pacientes:', error)
+
+        setErrorCarga(
+          'No se pudieron cargar los pacientes. Comprueba que el backend esté funcionando y que hayas iniciado sesión.',
+        )
+      } finally {
+        setCargando(false)
+      }
+    }
+
+    cargarPacientes()
+  }, [])
+
+  // Buscar por nombre, apellidos o correo electrónico.
+  const pacientesFiltrados = pacientes.filter((paciente) => {
+    const textoBusqueda = busqueda.toLowerCase().trim()
+
+    const coincideBusqueda = [
+      paciente.nombre,
+      paciente.apellido,
+      paciente.email,
+    ].some((dato) => dato.toLowerCase().includes(textoBusqueda))
+
+    const coincideEstado =
+      estadoFiltro === 'Todos' || paciente.estado === estadoFiltro
+
+    return coincideBusqueda && coincideEstado
+  })
 
   const totalPacientes = pacientes.length
   const totalActivos = pacientes.filter(
@@ -115,6 +118,7 @@ export default function PaginaPacientes() {
     setEstadoFiltro('Todos')
   }
 
+  // Este formulario aún no envía los datos al backend.
   const handleAgregarPaciente = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -123,29 +127,12 @@ export default function PaginaPacientes() {
       return
     }
 
-    const nuevoPaciente: Paciente = {
-      id: Date.now().toString(),
-      nombre: nombre.trim(),
-      apellido: apellido.trim(),
-      email: email.trim(),
-      telefono: 'No registrado',
-      especialidadAsignada: 'Por asignar',
-      ultimaCita: 'Sin citas previas',
-      estado: estadoNuevo,
-    }
-
-    setPacientes((prev) => [...prev, nuevoPaciente])
-
-    setNombre('')
-    setApellido('')
-    setEmail('')
-    setEstadoNuevo('activo')
-    setError('')
-    setBusqueda('')
-    setEstadoFiltro('Todos')
-    setMostrarFormulario(false)
+    setError(
+      'El formulario todavía no está conectado al backend. No se ha guardado ningún paciente.',
+    )
   }
 
+  // Estos cambios son locales y no se guardan en el servidor.
   const handleCambiarEstado = (
     id: string,
     estado: EstadoPaciente,
@@ -159,7 +146,7 @@ export default function PaginaPacientes() {
 
   const handleEliminarPaciente = (id: string) => {
     const confirmado = window.confirm(
-      '¿Estás seguro de que deseas eliminar este paciente?',
+      'Esta acción solo quitará el paciente de la pantalla. ¿Deseas continuar?',
     )
 
     if (!confirmado) return
@@ -183,7 +170,10 @@ export default function PaginaPacientes() {
             </div>
           </div>
 
-          <nav className="flex-1 space-y-2 p-4" aria-label="Navegación principal">
+          <nav
+            className="flex-1 space-y-2 p-4"
+            aria-label="Navegación principal"
+          >
             <p className="px-3 pb-2 pt-3 text-xs font-extrabold uppercase tracking-wider text-slate-400">
               Menú principal
             </p>
@@ -244,7 +234,7 @@ export default function PaginaPacientes() {
                   Pacientes
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
-                  Consulta, agrega y administra los pacientes registrados.
+                  Consulta y administra los pacientes registrados.
                 </p>
               </div>
 
@@ -260,6 +250,31 @@ export default function PaginaPacientes() {
                 {mostrarFormulario ? 'Cancelar' : 'Nuevo paciente'}
               </button>
             </section>
+
+            {cargando && (
+              <div
+                role="status"
+                className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700"
+              >
+                Cargando pacientes desde el servidor...
+              </div>
+            )}
+
+            {errorCarga && (
+              <div
+                role="alert"
+                className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
+              >
+                <p>{errorCarga}</p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-2 font-bold underline"
+                >
+                  Volver a intentar
+                </button>
+              </div>
+            )}
 
             {mostrarFormulario && (
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -342,7 +357,10 @@ export default function PaginaPacientes() {
                   </div>
 
                   {error && (
-                    <p role="alert" className="text-sm font-semibold text-rose-600 sm:col-span-2">
+                    <p
+                      role="alert"
+                      className="text-sm font-semibold text-rose-600 sm:col-span-2"
+                    >
                       {error}
                     </p>
                   )}
@@ -380,19 +398,19 @@ export default function PaginaPacientes() {
                 {
                   titulo: 'Activos',
                   valor: totalActivos,
-                  descripcion: 'Pacientes activos',
+                  descripcion: 'Estado provisional',
                   color: 'text-emerald-600',
                 },
                 {
                   titulo: 'En espera',
                   valor: totalEnEspera,
-                  descripcion: 'Pendientes de seguimiento',
+                  descripcion: 'Estado no proporcionado por la API',
                   color: 'text-amber-600',
                 },
                 {
                   titulo: 'Inactivos',
                   valor: totalInactivos,
-                  descripcion: 'Sin actividad reciente',
+                  descripcion: 'Estado no proporcionado por la API',
                   color: 'text-slate-500',
                 },
               ].map((tarjeta) => (
@@ -419,7 +437,9 @@ export default function PaginaPacientes() {
                   Directorio de pacientes
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  {pacientesFiltrados.length} paciente(s) encontrado(s)
+                  {cargando
+                    ? 'Consultando servidor...'
+                    : `${pacientesFiltrados.length} paciente(s) encontrado(s)`}
                 </p>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
@@ -465,33 +485,39 @@ export default function PaginaPacientes() {
                   </thead>
 
                   <tbody>
-                    {pacientesFiltrados.map((paciente) => (
-                      <PacienteRow
-                        key={paciente.id}
-                        paciente={paciente}
-                        onCambiarEstado={handleCambiarEstado}
-                        onEliminar={handleEliminarPaciente}
-                      />
-                    ))}
+                    {!cargando &&
+                      !errorCarga &&
+                      pacientesFiltrados.map((paciente) => (
+                        <PacienteRow
+                          key={paciente.id}
+                          paciente={paciente}
+                          onCambiarEstado={handleCambiarEstado}
+                          onEliminar={handleEliminarPaciente}
+                        />
+                      ))}
                   </tbody>
                 </table>
               </div>
 
-              {pacientesFiltrados.length === 0 && (
-                <p className="p-8 text-center text-sm text-slate-500">
-                  No se encontraron pacientes con esos filtros.
-                </p>
-              )}
+              {!cargando &&
+                !errorCarga &&
+                pacientesFiltrados.length === 0 && (
+                  <p className="p-8 text-center text-sm text-slate-500">
+                    No se encontraron pacientes con esos filtros.
+                  </p>
+                )}
 
               <div className="flex flex-col gap-3 p-4 md:hidden">
-                {pacientesFiltrados.map((paciente) => (
-                  <PacienteCard
-                    key={paciente.id}
-                    paciente={paciente}
-                    onCambiarEstado={handleCambiarEstado}
-                    onEliminar={handleEliminarPaciente}
-                  />
-                ))}
+                {!cargando &&
+                  !errorCarga &&
+                  pacientesFiltrados.map((paciente) => (
+                    <PacienteCard
+                      key={paciente.id}
+                      paciente={paciente}
+                      onCambiarEstado={handleCambiarEstado}
+                      onEliminar={handleEliminarPaciente}
+                    />
+                  ))}
               </div>
             </section>
 

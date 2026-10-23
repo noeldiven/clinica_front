@@ -1,55 +1,128 @@
-import { useState } from 'react'
+
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MetricCard from '../componentes/MetricCard'
 import StatusBadge from '../componentes/StatusBadge'
 import type { Metrica } from '../types'
+import api from '../lib/axios'
+
+interface RegistroAPI {
+  id: number | string
+}
+
+type RespuestaLista<T> =
+  | T[]
+  | {
+      data: T[]
+      total?: number
+    }
+
+interface DatosMetricas {
+  pacientes: number
+  medicos: number
+  citasProgramadas: number
+  completadas: number
+}
+
+const metricasIniciales: DatosMetricas = {
+  pacientes: 0,
+  medicos: 0,
+  citasProgramadas: 0,
+  completadas: 0,
+}
+
+function contarRegistros<T>(
+  respuesta: RespuestaLista<T>,
+): number {
+  if (Array.isArray(respuesta)) {
+    return respuesta.length
+  }
+
+  return respuesta.total ?? respuesta.data.length
+}
 
 export default function PaginaDashboard() {
-  const [pacientes, setPacientes] = useState(128)
+  const [datos, setDatos] = useState<DatosMetricas | null>(null)
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
   const [mantenimiento, setMantenimiento] = useState(false)
+
+  const cargarMetricas = useCallback(async () => {
+    setCargando(true)
+    setError('')
+
+    try {
+      const [
+        respuestaPacientes,
+        respuestaMedicos,
+        respuestaProgramadas,
+        respuestaCompletadas,
+      ] = await Promise.all([
+        api.get<RespuestaLista<RegistroAPI>>('/pacientes'),
+        api.get<RespuestaLista<RegistroAPI>>('/medicos'),
+        api.get<RespuestaLista<RegistroAPI>>('/citas', {
+          params: { estado: 'Programada' },
+        }),
+        api.get<RespuestaLista<RegistroAPI>>('/citas', {
+          params: { estado: 'Completada' },
+        }),
+      ])
+
+      setDatos({
+        pacientes: contarRegistros(respuestaPacientes.data),
+        medicos: contarRegistros(respuestaMedicos.data),
+        citasProgramadas: contarRegistros(respuestaProgramadas.data),
+        completadas: contarRegistros(respuestaCompletadas.data),
+      })
+    } catch (errorConsulta) {
+      console.error('Error al cargar las métricas:', errorConsulta)
+      setDatos(null)
+      setError(
+        'No se pudieron cargar las métricas. Comprueba que el backend esté activo y que tu sesión sea válida.',
+      )
+    } finally {
+      setCargando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void cargarMetricas()
+  }, [cargarMetricas])
 
   const metricas: Metrica[] = [
     {
       id: 'pacientes',
       titulo: 'Pacientes',
-      valor: pacientes,
+      valor: cargando ? '...' : (datos?.pacientes ?? '—'),
       descripcion: 'Total de pacientes registrados',
       tendencia: 'positiva',
       icono: '👥',
     },
     {
-      id: 'citas',
-      titulo: 'Citas Hoy',
-      valor: 24,
-      descripcion: 'Citas programadas para hoy',
+      id: 'medicos',
+      titulo: 'Médicos',
+      valor: cargando ? '...' : (datos?.medicos ?? '—'),
+      descripcion: 'Total de médicos registrados',
       tendencia: 'positiva',
+      icono: '🩺',
+    },
+    {
+      id: 'citas-programadas',
+      titulo: 'Citas Programadas',
+      valor: cargando ? '...' : (datos?.citasProgramadas ?? '—'),
+      descripcion: 'Citas con estado Programada',
+      tendencia: 'neutra',
       icono: '📅',
     },
     {
-      id: 'pendientes',
-      titulo: 'Consultas Pendientes',
-      valor: 8,
-      descripcion: 'Consultas por atender',
-      tendencia: 'negativa',
-      icono: '⏳',
-    },
-    {
-      id: 'disponibilidad',
-      titulo: 'Disponibilidad',
-      valor: '92%',
-      descripcion: 'Disponibilidad del sistema',
-      tendencia: 'neutra',
-      icono: '💚',
+      id: 'completadas',
+      titulo: 'Completadas Hoy',
+      valor: cargando ? '...' : (datos?.completadas ?? '—'),
+      descripcion: 'Citas con estado Completada',
+      tendencia: 'positiva',
+      icono: '✅',
     },
   ]
-
-  const incrementarPacientes = () => {
-    setPacientes((anterior) => anterior + 1)
-  }
-
-  const disminuirPacientes = () => {
-    setPacientes((anterior) => Math.max(0, anterior - 1))
-  }
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -80,6 +153,22 @@ export default function PaginaDashboard() {
         </div>
       )}
 
+      {error && (
+        <div
+          role="alert"
+          className="mb-6 rounded-lg border border-rose-200 bg-rose-50 p-4 text-rose-800"
+        >
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={() => void cargarMetricas()}
+            className="mt-3 rounded-lg bg-rose-700 px-4 py-2 font-semibold text-white hover:bg-rose-800"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
       <section
         aria-label="Indicadores de la clínica"
         className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
@@ -95,28 +184,19 @@ export default function PaginaDashboard() {
         </h2>
 
         <p className="mt-1 text-sm text-slate-500">
-          Utiliza los botones para modificar el total de pacientes.
+          El total se obtiene de los registros del backend.
         </p>
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={disminuirPacientes}
-            className="rounded-lg border border-slate-300 px-5 py-2 font-semibold text-slate-700 hover:bg-slate-100"
-          >
-            − Disminuir
-          </button>
-
-          <button
-            type="button"
-            onClick={incrementarPacientes}
-            className="rounded-lg bg-blue-600 px-5 py-2 font-semibold text-white hover:bg-blue-700"
-          >
-            + Aumentar
-          </button>
-
+        <div className="mt-5">
           <span className="text-sm text-slate-500">
-            Total actual: <strong>{pacientes}</strong>
+            Total de pacientes:{' '}
+            <strong>
+              {cargando
+                ? 'Cargando...'
+                : datos
+                  ? datos.pacientes
+                  : 'No disponible'}
+            </strong>
           </span>
         </div>
 
