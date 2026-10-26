@@ -1,11 +1,20 @@
-
 import { useEffect, useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
+import type { ChangeEvent } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import toast from 'react-hot-toast'
+
 import api from '../lib/axios'
 import PacienteRow from '../componentes/PacienteRow'
 import PacienteCard from '../componentes/PacienteCard'
 import BuscadorPacientes from '../componentes/BuscadorPacientes'
 import type { EstadoPaciente, Paciente } from '../types/paciente'
+import { pacienteSchema } from '../schemas/pacienteSchema'
+import type { PacienteFormData } from '../schemas/pacienteSchema'
+import { crearPaciente } from '../services/pacientes'
+import { adaptarPaciente } from '../services/pacientes'
+import { extraerMensajeError } from '../lib/errorHandler'
+
 
 interface PacienteAPI {
   id: number
@@ -26,13 +35,24 @@ export default function PaginaPacientes() {
     'Todos' | EstadoPaciente
   >('Todos')
 
-  const [mostrarFormulario, setMostrarFormulario] = useState(false)
-  const [nombre, setNombre] = useState('')
-  const [apellido, setApellido] = useState('')
-  const [email, setEmail] = useState('')
-  const [estadoNuevo, setEstadoNuevo] =
-    useState<EstadoPaciente>('activo')
-  const [error, setError] = useState('')
+ 
+const [mostrarFormulario, setMostrarFormulario] = useState(false)
+
+const {
+  register,
+  handleSubmit,
+  reset,
+  formState: { errors, isSubmitting },
+} = useForm<PacienteFormData>({
+  resolver: zodResolver(pacienteSchema),
+  defaultValues: {
+    nombre: '',
+    apellidos: '',
+    email: '',
+    telefono: '',
+    fechaNacimiento: '',
+  },
+})
 
   // Consultar los pacientes reales del backend.
   useEffect(() => {
@@ -119,18 +139,24 @@ export default function PaginaPacientes() {
   }
 
   // Este formulario aún no envía los datos al backend.
-  const handleAgregarPaciente = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+ 
+const handleAgregarPaciente = async (datos: PacienteFormData) => {
+  try {
+    const pacienteCreado = await crearPaciente(datos)
 
-    if (!nombre.trim() || !email.trim()) {
-      setError('Nombre y email son obligatorios')
-      return
-    }
+    setPacientes((prev) => [
+      adaptarPaciente(pacienteCreado),
+      ...prev,
+    ])
 
-    setError(
-      'El formulario todavía no está conectado al backend. No se ha guardado ningún paciente.',
-    )
+    reset()
+    setMostrarFormulario(false)
+    toast.success('Paciente registrado')
+  } catch (err: unknown) {
+    toast.error(extraerMensajeError(err))
   }
+}
+
 
   // Estos cambios son locales y no se guardan en el servidor.
   const handleCambiarEstado = (
@@ -242,7 +268,7 @@ export default function PaginaPacientes() {
                 type="button"
                 onClick={() => {
                   setMostrarFormulario((prev) => !prev)
-                  setError('')
+                  reset()
                 }}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700"
               >
@@ -275,7 +301,7 @@ export default function PaginaPacientes() {
                 </button>
               </div>
             )}
-
+            
             {mostrarFormulario && (
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <h2 className="text-lg font-extrabold text-slate-900">
@@ -283,100 +309,102 @@ export default function PaginaPacientes() {
                 </h2>
 
                 <form
-                  onSubmit={handleAgregarPaciente}
+                  onSubmit={handleSubmit(handleAgregarPaciente)}
                   className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2"
                 >
                   <div>
-                    <label
-                      htmlFor="nombre"
-                      className="mb-1 block text-sm font-semibold text-slate-700"
-                    >
+                    <label htmlFor="nombre" className="mb-1 block text-sm font-semibold text-slate-700">
                       Nombre *
                     </label>
                     <input
                       id="nombre"
-                      value={nombre}
-                      onChange={(event) => setNombre(event.target.value)}
+                      {...register('nombre')}
                       className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-blue-500"
                       placeholder="Nombre del paciente"
                     />
+                    {errors.nombre && (
+                      <p className="mt-1 text-sm text-rose-600">{errors.nombre.message}</p>
+                    )}
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="apellido"
-                      className="mb-1 block text-sm font-semibold text-slate-700"
-                    >
-                      Apellido
+                    <label htmlFor="apellidos" className="mb-1 block text-sm font-semibold text-slate-700">
+                      Apellidos *
                     </label>
                     <input
-                      id="apellido"
-                      value={apellido}
-                      onChange={(event) => setApellido(event.target.value)}
+                      id="apellidos"
+                      {...register('apellidos')}
                       className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-blue-500"
-                      placeholder="Apellido del paciente"
+                      placeholder="Apellidos del paciente"
                     />
+                    {errors.apellidos && (
+                      <p className="mt-1 text-sm text-rose-600">{errors.apellidos.message}</p>
+                    )}
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="email"
-                      className="mb-1 block text-sm font-semibold text-slate-700"
-                    >
+                    <label htmlFor="email" className="mb-1 block text-sm font-semibold text-slate-700">
                       Email *
                     </label>
                     <input
                       id="email"
                       type="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
+                      {...register('email')}
                       className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-blue-500"
                       placeholder="paciente@email.com"
                     />
+                    {errors.email && (
+                      <p className="mt-1 text-sm text-rose-600">{errors.email.message}</p>
+                    )}
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="estadoNuevo"
-                      className="mb-1 block text-sm font-semibold text-slate-700"
-                    >
-                      Estado
+                    <label htmlFor="telefono" className="mb-1 block text-sm font-semibold text-slate-700">
+                      Teléfono *
                     </label>
-                    <select
-                      id="estadoNuevo"
-                      value={estadoNuevo}
-                      onChange={(event) =>
-                        setEstadoNuevo(event.target.value as EstadoPaciente)
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-blue-500"
-                    >
-                      <option value="activo">Activo</option>
-                      <option value="inactivo">Inactivo</option>
-                      <option value="en_espera">En espera</option>
-                    </select>
+                    <input
+                      id="telefono"
+                      type="tel"
+                      {...register('telefono')}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-blue-500"
+                      placeholder="987654321"
+                    />
+                    {errors.telefono && (
+                      <p className="mt-1 text-sm text-rose-600">{errors.telefono.message}</p>
+                    )}
                   </div>
 
-                  {error && (
-                    <p
-                      role="alert"
-                      className="text-sm font-semibold text-rose-600 sm:col-span-2"
-                    >
-                      {error}
-                    </p>
-                  )}
+                  <div>
+                    <label htmlFor="fechaNacimiento" className="mb-1 block text-sm font-semibold text-slate-700">
+                      Fecha de nacimiento *
+                    </label>
+                    <input
+                      id="fechaNacimiento"
+                      type="date"
+                      {...register('fechaNacimiento')}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-blue-500"
+                    />
+                    {errors.fechaNacimiento && (
+                      <p className="mt-1 text-sm text-rose-600">
+                        {errors.fechaNacimiento.message}
+                      </p>
+                    )}
+                  </div>
 
                   <div className="flex flex-wrap gap-3 sm:col-span-2">
                     <button
                       type="submit"
-                      className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+                      disabled={isSubmitting}
+                      className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Guardar paciente
+                      {isSubmitting ? 'Guardando...' : 'Guardar paciente'}
                     </button>
+
                     <button
                       type="button"
                       onClick={() => {
+                        reset()
                         setMostrarFormulario(false)
-                        setError('')
                       }}
                       className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
                     >
@@ -386,6 +414,7 @@ export default function PaginaPacientes() {
                 </form>
               </section>
             )}
+
 
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {[
