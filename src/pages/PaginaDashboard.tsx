@@ -1,13 +1,14 @@
-
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MetricCard from '../componentes/MetricCard'
 import StatusBadge from '../componentes/StatusBadge'
 import type { Metrica } from '../types'
 import api from '../lib/axios'
+import ListaCitas from '../componentes/ListaCitas'
 
 interface RegistroAPI {
   id: number | string
+  estado?: string
 }
 
 type RespuestaLista<T> =
@@ -24,13 +25,6 @@ interface DatosMetricas {
   completadas: number
 }
 
-const metricasIniciales: DatosMetricas = {
-  pacientes: 0,
-  medicos: 0,
-  citasProgramadas: 0,
-  completadas: 0,
-}
-
 function contarRegistros<T>(
   respuesta: RespuestaLista<T>,
 ): number {
@@ -39,6 +33,19 @@ function contarRegistros<T>(
   }
 
   return respuesta.total ?? respuesta.data.length
+}
+
+function contarCitasPorEstado(
+  respuesta: RespuestaLista<RegistroAPI>,
+  estadoBuscado: string,
+): number {
+  const registros = Array.isArray(respuesta)
+    ? respuesta
+    : respuesta.data
+
+  return registros.filter(
+    (cita) => cita.estado === estadoBuscado,
+  ).length
 }
 
 export default function PaginaDashboard() {
@@ -52,27 +59,27 @@ export default function PaginaDashboard() {
     setError('')
 
     try {
-      const [
+            const [
         respuestaPacientes,
         respuestaMedicos,
-        respuestaProgramadas,
-        respuestaCompletadas,
+        respuestaCitas,
       ] = await Promise.all([
         api.get<RespuestaLista<RegistroAPI>>('/pacientes'),
         api.get<RespuestaLista<RegistroAPI>>('/medicos'),
-        api.get<RespuestaLista<RegistroAPI>>('/citas', {
-          params: { estado: 'Programada' },
-        }),
-        api.get<RespuestaLista<RegistroAPI>>('/citas', {
-          params: { estado: 'Completada' },
-        }),
+        api.get<RespuestaLista<RegistroAPI>>('/citas'),
       ])
 
       setDatos({
         pacientes: contarRegistros(respuestaPacientes.data),
         medicos: contarRegistros(respuestaMedicos.data),
-        citasProgramadas: contarRegistros(respuestaProgramadas.data),
-        completadas: contarRegistros(respuestaCompletadas.data),
+        citasProgramadas: contarCitasPorEstado(
+          respuestaCitas.data,
+          'PROGRAMADA',
+        ),
+        completadas: contarCitasPorEstado(
+          respuestaCitas.data,
+          'COMPLETADA',
+        ),
       })
     } catch (errorConsulta) {
       console.error('Error al cargar las métricas:', errorConsulta)
@@ -110,7 +117,7 @@ export default function PaginaDashboard() {
       id: 'citas-programadas',
       titulo: 'Citas Programadas',
       valor: cargando ? '...' : (datos?.citasProgramadas ?? '—'),
-      descripcion: 'Citas con estado Programada',
+      descripcion: 'Citas con estado COMPLETADA',
       tendencia: 'neutra',
       icono: '📅',
     },
@@ -231,6 +238,7 @@ export default function PaginaDashboard() {
             : 'Activar mantenimiento'}
         </button>
       </section>
+      <ListaCitas />
     </div>
   )
 }

@@ -11,7 +11,11 @@ import BuscadorPacientes from '../componentes/BuscadorPacientes'
 import type { EstadoPaciente, Paciente } from '../types/paciente'
 import { pacienteSchema } from '../schemas/pacienteSchema'
 import type { PacienteFormData } from '../schemas/pacienteSchema'
-import { crearPaciente } from '../services/pacientes'
+import {
+  crearPaciente,
+  eliminarPaciente,
+} from '../services/pacientes'
+import ModalConfirmacion from '../componentes/ModalConfirmacion'
 import { adaptarPaciente } from '../services/pacientes'
 import { extraerMensajeError } from '../lib/errorHandler'
 
@@ -30,12 +34,17 @@ export default function PaginaPacientes() {
   const [cargando, setCargando] = useState(true)
   const [errorCarga, setErrorCarga] = useState('')
 
+  const [pacientePorEliminar, setPacientePorEliminar] =
+    useState<string | null>(null)
+
+  const [eliminando, setEliminando] = useState(false)
+
   const [busqueda, setBusqueda] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState<
     'Todos' | EstadoPaciente
   >('Todos')
 
- 
+
 const [mostrarFormulario, setMostrarFormulario] = useState(false)
 
 const {
@@ -139,7 +148,7 @@ const {
   }
 
   // Este formulario aún no envía los datos al backend.
- 
+
 const handleAgregarPaciente = async (datos: PacienteFormData) => {
   try {
     const pacienteCreado = await crearPaciente(datos)
@@ -170,14 +179,34 @@ const handleAgregarPaciente = async (datos: PacienteFormData) => {
     )
   }
 
+
+  // Abrir el modal y guardar el paciente seleccionado.
   const handleEliminarPaciente = (id: string) => {
-    const confirmado = window.confirm(
-      'Esta acción solo quitará el paciente de la pantalla. ¿Deseas continuar?',
-    )
+    setPacientePorEliminar(id)
+  }
 
-    if (!confirmado) return
+  // Eliminar el paciente realmente desde el backend.
+  const confirmarEliminacionPaciente = async () => {
+    if (pacientePorEliminar === null || eliminando) return
 
-    setPacientes((prev) => prev.filter((paciente) => paciente.id !== id))
+    const id = pacientePorEliminar
+
+    setEliminando(true)
+
+    try {
+      await eliminarPaciente(Number(id))
+
+      setPacientes((prev) =>
+        prev.filter((paciente) => paciente.id !== id),
+      )
+
+      toast.success('Paciente eliminado correctamente')
+      setPacientePorEliminar(null)
+    } catch (err: unknown) {
+      toast.error(extraerMensajeError(err))
+    } finally {
+      setEliminando(false)
+    }
   }
 
   return (
@@ -301,7 +330,7 @@ const handleAgregarPaciente = async (datos: PacienteFormData) => {
                 </button>
               </div>
             )}
-            
+
             {mostrarFormulario && (
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <h2 className="text-lg font-extrabold text-slate-900">
@@ -556,6 +585,22 @@ const handleAgregarPaciente = async (datos: PacienteFormData) => {
           </div>
         </main>
       </div>
+
+      <ModalConfirmacion
+        abierto={pacientePorEliminar !== null}
+        titulo="Eliminar paciente"
+        mensaje="Esta acción eliminará al paciente del sistema y no se puede deshacer. ¿Deseas continuar?"
+        confirmando={eliminando}
+        textoConfirmar="Eliminar paciente"
+        onCancelar={() => {
+          if (!eliminando) {
+            setPacientePorEliminar(null)
+          }
+        }}
+        onConfirmar={() => {
+          void confirmarEliminacionPaciente()
+        }}
+      />
     </div>
   )
 }
