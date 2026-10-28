@@ -42,3 +42,19 @@ export async function actualizarEstadoCita(
 
   return respuesta.data
 }
+
+
+export interface CrearCitaDTO {
+  pacienteId: number
+  medicoId: number
+  fechaHora: string
+  motivoConsulta?: string
+  diagnostico?: string
+}
+
+export async function crearCita(
+  datos: CrearCitaDTO,
+): Promise<CitaAPI> {
+  const respuesta = await api.post<CitaAPI>('/citas', datos)
+  return respuesta.data
+}
