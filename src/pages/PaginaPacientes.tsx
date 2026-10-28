@@ -13,10 +13,11 @@ import { pacienteSchema } from '../schemas/pacienteSchema'
 import type { PacienteFormData } from '../schemas/pacienteSchema'
 import {
   crearPaciente,
+  actualizarPaciente,
+  adaptarPaciente,
   eliminarPaciente,
 } from '../services/pacientes'
 import ModalConfirmacion from '../componentes/ModalConfirmacion'
-import { adaptarPaciente } from '../services/pacientes'
 import { extraerMensajeError } from '../lib/errorHandler'
 
 
@@ -46,7 +47,8 @@ export default function PaginaPacientes() {
 
 
 const [mostrarFormulario, setMostrarFormulario] = useState(false)
-
+const [pacienteEnEdicion, setPacienteEnEdicion] =
+  useState<PacienteAPI | null>(null)
 const {
   register,
   handleSubmit,
@@ -148,24 +150,68 @@ const {
   }
 
   // Este formulario aún no envía los datos al backend.
+const handleEditarPaciente = (id: string) => {
+  const paciente = pacientes.find((item) => item.id === id)
 
+  if (!paciente) {
+    toast.error('No se encontró el paciente seleccionado')
+    return
+  }
+
+  setPacienteEnEdicion({
+    id: Number(paciente.id),
+    nombre: paciente.nombre,
+    apellidos: paciente.apellido,
+    email: paciente.email,
+    telefono: paciente.telefono,
+    fechaNacimiento: '',
+  })
+
+  reset({
+    nombre: paciente.nombre,
+    apellidos: paciente.apellido,
+    email: paciente.email,
+    telefono: paciente.telefono,
+    fechaNacimiento: '',
+  })
+
+  setMostrarFormulario(true)
+}
 const handleAgregarPaciente = async (datos: PacienteFormData) => {
   try {
-    const pacienteCreado = await crearPaciente(datos)
+    if (pacienteEnEdicion) {
+      const pacienteActualizado = await actualizarPaciente(
+        pacienteEnEdicion.id,
+        datos,
+      )
 
-    setPacientes((prev) => [
-      adaptarPaciente(pacienteCreado),
-      ...prev,
-    ])
+      setPacientes((prev) =>
+        prev.map((paciente) =>
+          paciente.id === String(pacienteActualizado.id)
+            ? adaptarPaciente(pacienteActualizado)
+            : paciente,
+        ),
+      )
+
+      toast.success('Paciente actualizado correctamente')
+    } else {
+      const pacienteCreado = await crearPaciente(datos)
+
+      setPacientes((prev) => [
+        adaptarPaciente(pacienteCreado),
+        ...prev,
+      ])
+
+      toast.success('Paciente registrado correctamente')
+    }
 
     reset()
+    setPacienteEnEdicion(null)
     setMostrarFormulario(false)
-    toast.success('Paciente registrado')
   } catch (err: unknown) {
     toast.error(extraerMensajeError(err))
   }
 }
-
 
   // Estos cambios son locales y no se guardan en el servidor.
   const handleCambiarEstado = (
@@ -296,13 +342,22 @@ const handleAgregarPaciente = async (datos: PacienteFormData) => {
               <button
                 type="button"
                 onClick={() => {
-                  setMostrarFormulario((prev) => !prev)
-                  reset()
+                  if (mostrarFormulario) {
+                    setMostrarFormulario(false)
+                    setPacienteEnEdicion(null)
+                    reset()
+                  } else {
+                    setPacienteEnEdicion(null)
+                    reset()
+                    setMostrarFormulario(true)
+                  }
                 }}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700"
               >
                 <span className="text-xl">＋</span>
-                {mostrarFormulario ? 'Cancelar' : 'Nuevo paciente'}
+                {mostrarFormulario
+                  ? 'Cancelar'
+                  : 'Nuevo paciente'}
               </button>
             </section>
 
@@ -426,13 +481,18 @@ const handleAgregarPaciente = async (datos: PacienteFormData) => {
                       disabled={isSubmitting}
                       className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {isSubmitting ? 'Guardando...' : 'Guardar paciente'}
+                      {isSubmitting
+                        ? 'Guardando...'
+                        : pacienteEnEdicion
+                          ? 'Guardar cambios'
+                          : 'Guardar paciente'}
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
                         reset()
+                        setPacienteEnEdicion(null)
                         setMostrarFormulario(false)
                       }}
                       className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
@@ -549,6 +609,7 @@ const handleAgregarPaciente = async (datos: PacienteFormData) => {
                         <PacienteRow
                           key={paciente.id}
                           paciente={paciente}
+                          onEditar={handleEditarPaciente}
                           onCambiarEstado={handleCambiarEstado}
                           onEliminar={handleEliminarPaciente}
                         />
@@ -573,6 +634,7 @@ const handleAgregarPaciente = async (datos: PacienteFormData) => {
                       key={paciente.id}
                       paciente={paciente}
                       onCambiarEstado={handleCambiarEstado}
+                      onEditar={handleEditarPaciente}
                       onEliminar={handleEliminarPaciente}
                     />
                   ))}

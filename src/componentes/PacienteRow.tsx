@@ -1,3 +1,4 @@
+
 import type { ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import BadgeEstado from './BadgeEstado'
@@ -6,12 +7,14 @@ import type { EstadoPaciente, Paciente } from '../types/paciente'
 interface PacienteRowProps {
   paciente: Paciente
   onCambiarEstado: (id: string, estado: EstadoPaciente) => void
+  onEditar: (id: string) => void
   onEliminar: (id: string) => void
 }
 
 export default function PacienteRow({
   paciente,
   onCambiarEstado,
+  onEditar,
   onEliminar,
 }: PacienteRowProps) {
   const iniciales = `${paciente.nombre.charAt(0)}${paciente.apellido.charAt(0)}`
@@ -37,14 +40,10 @@ export default function PacienteRow({
         </div>
       </td>
 
-      <td className="px-5 py-4 text-sm text-slate-600">
-        {paciente.telefono}
-      </td>
-
+      <td className="px-5 py-4 text-sm text-slate-600">{paciente.telefono}</td>
       <td className="px-5 py-4 text-sm text-slate-600">
         {paciente.especialidadAsignada}
       </td>
-
       <td className="px-5 py-4 text-sm text-slate-600">
         {paciente.ultimaCita}
       </td>
@@ -74,6 +73,14 @@ export default function PacienteRow({
           >
             Ver detalle →
           </Link>
+
+          <button
+            type="button"
+            onClick={() => onEditar(paciente.id)}
+            className="rounded-lg px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+          >
+            Editar
+          </button>
 
           <button
             type="button"

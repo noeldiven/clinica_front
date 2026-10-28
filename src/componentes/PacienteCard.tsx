@@ -1,3 +1,4 @@
+
 import type { ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import BadgeEstado from './BadgeEstado'
@@ -6,12 +7,14 @@ import type { EstadoPaciente, Paciente } from '../types/paciente'
 interface PacienteCardProps {
   paciente: Paciente
   onCambiarEstado: (id: string, estado: EstadoPaciente) => void
+  onEditar: (id: string) => void
   onEliminar: (id: string) => void
 }
 
 export default function PacienteCard({
   paciente,
   onCambiarEstado,
+  onEditar,
   onEliminar,
 }: PacienteCardProps) {
   const handleEstadoChange = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -30,9 +33,7 @@ export default function PacienteCard({
           <h3 className="font-bold text-slate-900">
             {paciente.nombre} {paciente.apellido}
           </h3>
-          <p className="break-words text-sm text-slate-500">
-            {paciente.email}
-          </p>
+          <p className="break-words text-sm text-slate-500">{paciente.email}</p>
         </div>
       </div>
 
@@ -48,9 +49,7 @@ export default function PacienteCard({
 
         <div>
           <p className="text-xs font-semibold text-slate-400">Especialidad</p>
-          <p className="mt-1 text-slate-700">
-            {paciente.especialidadAsignada}
-          </p>
+          <p className="mt-1 text-slate-700">{paciente.especialidadAsignada}</p>
         </div>
 
         <div className="col-span-2">
@@ -86,6 +85,14 @@ export default function PacienteCard({
       >
         Ver detalle →
       </Link>
+
+      <button
+        type="button"
+        onClick={() => onEditar(paciente.id)}
+        className="w-full rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+      >
+        Editar paciente
+      </button>
 
       <button
         type="button"
