@@ -1,6 +1,6 @@
-
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { extraerMensajeError } from '../lib/errorHandler'
 import {
   actualizarEstadoCita,
   obtenerCitas,
@@ -36,10 +36,10 @@ export default function ListaCitas() {
     try {
       const datos = await obtenerCitas()
       setCitas(datos)
-    } catch {
-      setError('No se pudieron cargar las citas.')
-      toast.error('Error al cargar las citas')
-    } finally {
+     } catch (err: unknown) {
+        setError(extraerMensajeError(err))
+        toast.error(extraerMensajeError(err))
+        } finally {
       setCargando(false)
     }
   }, [])
@@ -87,17 +87,17 @@ export default function ListaCitas() {
       )
 
       toast.success('Estado de la cita actualizado')
-    } catch {
-      // Si falla el servidor, restauramos el estado anterior.
-      setCitas((actuales) =>
-        actuales.map((item) =>
-          item.id === cita.id
-            ? { ...item, estado: estadoAnterior }
-            : item,
-        ),
-      )
+    } catch(err: unknown) {
+        // Si falla el servidor, restauramos el estado anterior.
+        setCitas((actuales) =>
+            actuales.map((item) =>
+            item.id === cita.id
+                ? { ...item, estado: estadoAnterior }
+                : item,
+            ),
+        )
 
-      toast.error('No se pudo actualizar el estado de la cita')
+        toast.error(extraerMensajeError(err))
     } finally {
       setActualizando((actuales) =>
         actuales.filter((id) => id !== cita.id),
