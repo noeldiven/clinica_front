@@ -47,3 +47,10 @@ export function adaptarPaciente(paciente: PacienteAPI): Paciente {
     estado: 'activo',
   }
 }
+
+
+export async function obtenerPacientes(): Promise<PacienteAPI[]> {
+  const respuesta = await api.get<PacienteAPI[]>('/pacientes')
+  return respuesta.data
+}
+

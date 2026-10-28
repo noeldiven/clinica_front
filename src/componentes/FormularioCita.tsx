@@ -1,12 +1,30 @@
-
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { citaSchema, type CitaFormData } from '../schemas/citaSchema'
 import useMedicos from '../hooks/useMedicos'
+import {
+  crearPaciente,
+  obtenerPacientes,
+  type PacienteAPI,
+} from '../services/pacientes'
+import { crearCita } from '../services/citas'
+import axios from 'axios'
 
 export default function FormularioCita() {
-  const { medicos, cargando } = useMedicos()
+  const {
+    medicos,
+    cargando,
+    error: errorMedicos,
+  } = useMedicos()
+  const [emailPaciente, setEmailPaciente] = useState('')
+  const [fechaNacimiento, setFechaNacimiento] = useState('')
+  const [telefonoPaciente, setTelefonoPaciente] = useState('')
+  const [pacienteEncontrado, setPacienteEncontrado] =
+    useState<PacienteAPI | null>(null)
+  const [busquedaRealizada, setBusquedaRealizada] = useState(false)
+  const [buscandoPaciente, setBuscandoPaciente] = useState(false)
+  const [errorApi, setErrorApi] = useState('')
   const [citaConfirmada, setCitaConfirmada] = useState<CitaFormData | null>(
     null,
   )
@@ -27,11 +45,126 @@ export default function FormularioCita() {
       urgencia: 'media',
     },
   })
+  const buscarPaciente = async () => {
+    const email = emailPaciente.trim().toLowerCase()
 
-  const onSubmit = async (datos: CitaFormData) => {
-    await new Promise<void>((resolve) => setTimeout(resolve, 1500))
-    setCitaConfirmada(datos)
+    if (!email) {
+      setErrorApi('Introduce el correo electrónico del paciente.')
+        return
+      }
+
+    setBuscandoPaciente(true)
+    setErrorApi('')
+
+    try {
+      const pacientes = await obtenerPacientes()
+
+      const encontrado = pacientes.find(
+        (paciente) => paciente.email.toLowerCase() === email,
+      )
+
+      setPacienteEncontrado(encontrado ?? null)
+      setBusquedaRealizada(true)
+
+      if (encontrado) {
+        setErrorApi('')
+      }
+    } catch (error: unknown) {
+      setErrorApi(
+        axios.isAxiosError(error)
+          ? String(
+              error.response?.data?.message ??
+                error.message ??
+                'No se pudo consultar a los pacientes.',
+            )
+          : 'No se pudo consultar a los pacientes.',
+      )
+    } finally {
+      setBuscandoPaciente(false)
+    }
   }
+  const onSubmit = async (datos: CitaFormData) => {
+      setErrorApi('')
+
+      try {
+        let paciente = pacienteEncontrado
+
+        // Comprobar que el paciente existe en el backend.
+        if (!paciente) {
+          const email = emailPaciente.trim().toLowerCase()
+
+          if (!email) {
+            setErrorApi('Introduce el correo electrónico del paciente.')
+            return
+          }
+
+          const pacientes = await obtenerPacientes()
+
+          paciente =
+            pacientes.find(
+              (item) => item.email.toLowerCase() === email,
+            ) ?? null
+
+          // Si no existe, registrarlo antes de crear la cita.
+          if (!paciente) {
+            const partesNombre = datos.pacienteNombre
+              .trim()
+              .split(/\s+/)
+
+            if (partesNombre.length < 2) {
+              setErrorApi(
+                'Para registrar un paciente nuevo, introduce su nombre y apellidos.',
+              )
+              return
+            }
+
+            if (!fechaNacimiento) {
+              setErrorApi(
+                'Introduce la fecha de nacimiento del paciente nuevo.',
+              )
+              return
+            }
+
+            paciente = await crearPaciente({
+              nombre: partesNombre[0],
+              apellidos: partesNombre.slice(1).join(' '),
+              email,
+              telefono: telefonoPaciente.trim(),
+              fechaNacimiento,
+            })
+          }
+        }
+
+        // El backend espera una fecha y hora en formato ISO.
+        const fechaHora = new Date(
+          `${datos.fecha}T${datos.hora}:00`,
+        ).toISOString()
+
+        await crearCita({
+          pacienteId: paciente.id,
+          medicoId: Number(datos.medicoId),
+          fechaHora,
+          motivoConsulta: datos.motivo,
+        })
+
+        setCitaConfirmada({
+          ...datos,
+          pacienteNombre: `${paciente.nombre} ${paciente.apellidos}`.trim(),
+        })
+      } catch (error: unknown) {
+        setErrorApi(
+          axios.isAxiosError(error)
+            ? String(
+                error.response?.data?.message ??
+                  error.message ??
+                  'No se pudo registrar la cita.',
+              )
+            : error instanceof Error
+              ? error.message
+              : 'No se pudo registrar la cita.',
+        )
+      }
+    }
 
   const agendarOtraCita = () => {
     reset()
@@ -47,7 +180,7 @@ export default function FormularioCita() {
 
   if (citaConfirmada) {
     const medicoSeleccionado = medicos.find(
-      (medico) => medico.id === citaConfirmada.medicoId,
+      (medico) => String(medico.id) === citaConfirmada.medicoId,
     )
 
     return (
@@ -151,6 +284,14 @@ export default function FormularioCita() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+        {errorApi && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        >
+          {errorApi}
+        </div>
+      )}
         <div>
           <label
             htmlFor="pacienteNombre"
@@ -175,7 +316,93 @@ export default function FormularioCita() {
             </p>
           )}
         </div>
+          <div>
+            <label
+              htmlFor="emailPaciente"
+              className="mb-1.5 block text-sm font-medium text-gray-700"
+            >
+              Correo electrónico del paciente
+            </label>
 
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                id="emailPaciente"
+                type="email"
+                value={emailPaciente}
+                onChange={(event) => {
+                  setEmailPaciente(event.target.value)
+                  setPacienteEncontrado(null)
+                  setBusquedaRealizada(false)
+                  setErrorApi('')
+                }}
+                placeholder="paciente@correo.com"
+                className={claseCampo(false)}
+              />
+
+              <button
+                type="button"
+                onClick={() => void buscarPaciente()}
+                disabled={buscandoPaciente}
+                className="rounded-lg bg-gray-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+              >
+                {buscandoPaciente ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
+
+            {pacienteEncontrado && (
+              <p className="mt-2 text-sm text-green-700">
+                Paciente encontrado: {pacienteEncontrado.nombre}{' '}
+                {pacienteEncontrado.apellidos}
+              </p>
+            )}
+
+            {busquedaRealizada && !pacienteEncontrado && (
+              <p className="mt-2 text-sm text-blue-700">
+                No se encontró el paciente. Completa su fecha de nacimiento
+                para registrarlo.
+              </p>
+            )}
+          </div>
+
+          {busquedaRealizada && !pacienteEncontrado && (
+            <>
+              <div>
+                <label
+                  htmlFor="fechaNacimiento"
+                  className="mb-1.5 block text-sm font-medium text-gray-700"
+                >
+                  Fecha de nacimiento
+                </label>
+
+                <input
+                  id="fechaNacimiento"
+                  type="date"
+                  value={fechaNacimiento}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={(event) => setFechaNacimiento(event.target.value)}
+                  className={claseCampo(false)}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="telefonoPaciente"
+                  className="mb-1.5 block text-sm font-medium text-gray-700"
+                >
+                  Teléfono (opcional)
+                </label>
+
+                <input
+                  id="telefonoPaciente"
+                  type="tel"
+                  value={telefonoPaciente}
+                  onChange={(event) => setTelefonoPaciente(event.target.value)}
+                  placeholder="987654321"
+                  className={claseCampo(false)}
+                />
+              </div>
+            </>
+          )}
         <div>
           <label
             htmlFor="medicoId"
@@ -196,10 +423,15 @@ export default function FormularioCita() {
             </option>
             {medicos.map((medico) => (
               <option key={medico.id} value={medico.id}>
-                {medico.nombre} — {medico.especialidad}
+                {medico.nombre} {medico.apellidos} — {medico.especialidad?.nombre ?? 'Sin especialidad'}
               </option>
             ))}
           </select>
+          {errorMedicos && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              No se pudieron cargar los médicos: {errorMedicos}
+            </p>
+          )}
           {errors.medicoId && (
             <p id="medicoId-error" className="mt-1 text-sm text-red-600">
               {errors.medicoId.message}
