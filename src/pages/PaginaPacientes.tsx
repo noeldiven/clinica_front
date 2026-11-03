@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import toast from 'react-hot-toast'
 
-import api from '../lib/axios'
 import PacienteRow from '../componentes/PacienteRow'
 import PacienteCard from '../componentes/PacienteCard'
 import BuscadorPacientes from '../componentes/BuscadorPacientes'
@@ -16,19 +15,13 @@ import {
   actualizarPaciente,
   adaptarPaciente,
   eliminarPaciente,
+  obtenerPacientes,
 } from '../services/pacientes'
+
+import type { PacienteAPI } from '../services/pacientes'
 import ModalConfirmacion from '../componentes/ModalConfirmacion'
 import { extraerMensajeError } from '../lib/errorHandler'
 
-
-interface PacienteAPI {
-  id: number
-  nombre: string
-  apellidos: string
-  email: string
-  telefono: string
-  fechaNacimiento: string
-}
 
 export default function PaginaPacientes() {
   const [pacientes, setPacientes] = useState<Paciente[]>([])
@@ -66,44 +59,30 @@ const {
 })
 
   // Consultar los pacientes reales del backend.
-  useEffect(() => {
-    async function cargarPacientes() {
-      try {
-        setCargando(true)
-        setErrorCarga('')
+useEffect(() => {
+  async function cargarPacientes() {
+    try {
+      setCargando(true)
+      setErrorCarga('')
 
-        const respuesta = await api.get<PacienteAPI[]>('/pacientes')
+      const datos = await obtenerPacientes()
 
-        const pacientesAdaptados: Paciente[] = respuesta.data.map(
-          (paciente) => ({
-            id: String(paciente.id),
-            nombre: paciente.nombre,
-            apellido: paciente.apellidos,
-            email: paciente.email,
-            telefono: paciente.telefono,
-            especialidadAsignada: 'No disponible',
-            ultimaCita: 'No disponible',
-            // El backend actual no proporciona el estado clínico.
-            // Se usa este valor solo para mantener la compatibilidad
-            // con los componentes existentes.
-            estado: 'activo',
-          }),
-        )
+      const pacientesAdaptados = datos.map(adaptarPaciente)
 
-        setPacientes(pacientesAdaptados)
-      } catch (error) {
-        console.error('Error al cargar pacientes:', error)
+      setPacientes(pacientesAdaptados)
+    } catch (error: unknown) {
+      const mensaje = extraerMensajeError(error)
 
-        setErrorCarga(
-          'No se pudieron cargar los pacientes. Comprueba que el backend esté funcionando y que hayas iniciado sesión.',
-        )
-      } finally {
-        setCargando(false)
-      }
+      console.error('Error al cargar pacientes:', mensaje)
+      setErrorCarga(mensaje)
+      toast.error(mensaje)
+    } finally {
+      setCargando(false)
     }
+  }
 
-    cargarPacientes()
-  }, [])
+  cargarPacientes()
+}, [])
 
   // Buscar por nombre, apellidos o correo electrónico.
   const pacientesFiltrados = pacientes.filter((paciente) => {
