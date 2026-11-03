@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useOptimistic,
+  useState,
+  useTransition,
+} from 'react'
 import toast from 'react-hot-toast'
 import { extraerMensajeError } from '../lib/errorHandler'
 import {
@@ -28,6 +34,20 @@ export default function ListaCitas() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [actualizando, setActualizando] = useState<number[]>([])
+  const [, startTransition] = useTransition()
+
+  const [citasOptimistas, actualizarCitasOptimistas] = useOptimistic(
+    citas,
+    (
+      estadoActual,
+      cambio: { id: number; estado: EstadoCita },
+    ) =>
+      estadoActual.map((cita) =>
+        cita.id === cambio.id
+          ? { ...cita, estado: cambio.estado }
+          : cita,
+      ),
+  )
 
   const cargarCitas = useCallback(async () => {
     setCargando(true)
@@ -36,10 +56,11 @@ export default function ListaCitas() {
     try {
       const datos = await obtenerCitas()
       setCitas(datos)
-     } catch (err: unknown) {
-        setError(extraerMensajeError(err))
-        toast.error(extraerMensajeError(err))
-        } finally {
+    } catch (err: unknown) {
+      const mensaje = extraerMensajeError(err)
+      setError(mensaje)
+      toast.error(mensaje)
+    } finally {
       setCargando(false)
     }
   }, [])
@@ -48,7 +69,7 @@ export default function ListaCitas() {
     void cargarCitas()
   }, [cargarCitas])
 
-  const cambiarEstado = async (
+  const cambiarEstado = (
     cita: CitaAPI,
     nuevoEstado: EstadoCita,
   ) => {
@@ -59,50 +80,45 @@ export default function ListaCitas() {
       return
     }
 
-    const estadoAnterior = cita.estado
-
-    // Actualización optimista: la interfaz cambia inmediatamente.
-    setCitas((actuales) =>
-      actuales.map((item) =>
-        item.id === cita.id
-          ? { ...item, estado: nuevoEstado }
-          : item,
-      ),
-    )
-
     setActualizando((actuales) => [...actuales, cita.id])
 
-    try {
-      const citaActualizada = await actualizarEstadoCita(
-        cita.id,
-        nuevoEstado,
-      )
+    startTransition(async () => {
+      // React muestra inmediatamente el nuevo estado.
+      actualizarCitasOptimistas({
+        id: cita.id,
+        estado: nuevoEstado,
+      })
 
-      setCitas((actuales) =>
-        actuales.map((item) =>
-          item.id === cita.id
-            ? { ...item, ...citaActualizada }
-            : item,
-        ),
-      )
-
-      toast.success('Estado de la cita actualizado')
-    } catch(err: unknown) {
-        // Si falla el servidor, restauramos el estado anterior.
-        setCitas((actuales) =>
-            actuales.map((item) =>
-            item.id === cita.id
-                ? { ...item, estado: estadoAnterior }
-                : item,
-            ),
+      try {
+        const citaActualizada = await actualizarEstadoCita(
+          cita.id,
+          nuevoEstado,
         )
 
-        toast.error(extraerMensajeError(err))
-    } finally {
-      setActualizando((actuales) =>
-        actuales.filter((id) => id !== cita.id),
-      )
-    }
+        // Confirmamos el cambio en el estado real.
+        startTransition(() => {
+          setCitas((actuales) =>
+            actuales.map((item) =>
+              item.id === cita.id
+                ? { ...item, ...citaActualizada }
+                : item,
+            ),
+          )
+        })
+
+        toast.success('Estado de la cita actualizado')
+      } catch (err: unknown) {
+        // Al finalizar la transición, React revierte
+        // automáticamente la actualización optimista.
+        toast.error(
+          `Cambio revertido: ${extraerMensajeError(err)}`,
+        )
+      } finally {
+        setActualizando((actuales) =>
+          actuales.filter((id) => id !== cita.id),
+        )
+      }
+    })
   }
 
   if (cargando) {
@@ -147,7 +163,7 @@ export default function ListaCitas() {
         </div>
       )}
 
-      {!error && citas.length === 0 ? (
+      {!error && citasOptimistas.length === 0 ? (
         <p className="rounded-lg bg-slate-50 p-5 text-center text-slate-500">
           No hay citas registradas.
         </p>
@@ -164,7 +180,7 @@ export default function ListaCitas() {
             </thead>
 
             <tbody>
-              {citas.map((cita) => (
+              {citasOptimistas.map((cita) => (
                 <tr
                   key={cita.id}
                   className="border-b border-slate-100 last:border-0"
@@ -191,7 +207,7 @@ export default function ListaCitas() {
                       value={cita.estado}
                       disabled={actualizando.includes(cita.id)}
                       onChange={(event) =>
-                        void cambiarEstado(
+                        cambiarEstado(
                           cita,
                           event.target.value as EstadoCita,
                         )
